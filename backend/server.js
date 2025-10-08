@@ -20,10 +20,11 @@ app.get('/api/artikli/stanje', (_req, res) => {
       nabavna_cena: row[3],
       ocekivana_cena: row[4],
       datum_kupovine: row[5],
-      prodat: row[6],
-      datum_prodaje: row[7],
-      prodajna_cena: row[8],
-      vreme_prodaje_dana: row[9]
+      kolicina: row[6] || 1,
+      prodat: row[7],
+      datum_prodaje: row[8],
+      prodajna_cena: row[9],
+      vreme_prodaje_dana: row[10]
     })) : [];
     res.json(artikli);
   } catch (error) {
@@ -43,10 +44,11 @@ app.get('/api/artikli/prodati', (_req, res) => {
       nabavna_cena: row[3],
       ocekivana_cena: row[4],
       datum_kupovine: row[5],
-      prodat: row[6],
-      datum_prodaje: row[7],
-      prodajna_cena: row[8],
-      vreme_prodaje_dana: row[9]
+      kolicina: row[6] || 1,
+      prodat: row[7],
+      datum_prodaje: row[8],
+      prodajna_cena: row[9],
+      vreme_prodaje_dana: row[10]
     })) : [];
     res.json(artikli);
   } catch (error) {
@@ -58,12 +60,12 @@ app.get('/api/artikli/prodati', (_req, res) => {
 app.post('/api/artikli', (req, res) => {
   try {
     const db = getDb();
-    const { kategorija, naziv, nabavna_cena, ocekivana_cena } = req.body;
+    const { kategorija, naziv, nabavna_cena, ocekivana_cena, kolicina } = req.body;
     const datum_kupovine = new Date().toISOString().split('T')[0];
 
     db.run(
-      'INSERT INTO artikli (kategorija, naziv, nabavna_cena, ocekivana_cena, datum_kupovine) VALUES (?, ?, ?, ?, ?)',
-      [kategorija, naziv, nabavna_cena, ocekivana_cena || null, datum_kupovine]
+      'INSERT INTO artikli (kategorija, naziv, nabavna_cena, ocekivana_cena, datum_kupovine, kolicina) VALUES (?, ?, ?, ?, ?, ?)',
+      [kategorija, naziv, nabavna_cena, ocekivana_cena || null, datum_kupovine, kolicina || 1]
     );
 
     saveDatabase();
@@ -78,6 +80,7 @@ app.post('/api/artikli', (req, res) => {
       nabavna_cena,
       ocekivana_cena,
       datum_kupovine,
+      kolicina: kolicina || 1,
       prodat: 0
     });
   } catch (error) {
@@ -90,11 +93,11 @@ app.put('/api/artikli/:id', (req, res) => {
   try {
     const db = getDb();
     const { id } = req.params;
-    const { kategorija, naziv, nabavna_cena, ocekivana_cena, prodajna_cena } = req.body;
+    const { kategorija, naziv, nabavna_cena, ocekivana_cena, prodajna_cena, kolicina } = req.body;
 
     db.run(
-      'UPDATE artikli SET kategorija = ?, naziv = ?, nabavna_cena = ?, ocekivana_cena = ?, prodajna_cena = ? WHERE id = ?',
-      [kategorija, naziv, nabavna_cena, ocekivana_cena || null, prodajna_cena || null, id]
+      'UPDATE artikli SET kategorija = ?, naziv = ?, nabavna_cena = ?, ocekivana_cena = ?, prodajna_cena = ?, kolicina = ? WHERE id = ?',
+      [kategorija, naziv, nabavna_cena, ocekivana_cena || null, prodajna_cena || null, kolicina || 1, id]
     );
 
     saveDatabase();
@@ -112,10 +115,11 @@ app.put('/api/artikli/:id', (req, res) => {
       nabavna_cena: row[3],
       ocekivana_cena: row[4],
       datum_kupovine: row[5],
-      prodat: row[6],
-      datum_prodaje: row[7],
-      prodajna_cena: row[8],
-      vreme_prodaje_dana: row[9]
+      kolicina: row[6] || 1,
+      prodat: row[7],
+      datum_prodaje: row[8],
+      prodajna_cena: row[9],
+      vreme_prodaje_dana: row[10]
     };
 
     res.json(updatedArtikal);
@@ -129,45 +133,50 @@ app.put('/api/artikli/:id/prodaj', (req, res) => {
   try {
     const db = getDb();
     const { id } = req.params;
-    const { prodajna_cena } = req.body;
+    const { prodajna_cena, kolicina_prodato } = req.body;
     const datum_prodaje = new Date().toISOString().split('T')[0];
 
-    // Dobavi datum kupovine
-    const result = db.exec('SELECT datum_kupovine FROM artikli WHERE id = ?', [id]);
+    // Dobavi informacije o artiklu
+    const result = db.exec('SELECT * FROM artikli WHERE id = ?', [id]);
 
     if (result.length === 0 || result[0].values.length === 0) {
       return res.status(404).json({ error: 'Artikal nije pronađen' });
     }
 
-    const datum_kupovine = result[0].values[0][0];
+    const row = result[0].values[0];
+    const kategorija = row[1];
+    const naziv = row[2];
+    const nabavna_cena = row[3];
+    const ocekivana_cena = row[4];
+    const datum_kupovine = row[5];
+    const kolicina_trenutna = row[6] || 1;
 
     // Izračunaj broj dana
     const datumKupovine = new Date(datum_kupovine);
     const datumProdaje = new Date(datum_prodaje);
     const vreme_prodaje_dana = Math.floor((datumProdaje - datumKupovine) / (1000 * 60 * 60 * 24));
 
-    db.run(
-      'UPDATE artikli SET prodat = 1, datum_prodaje = ?, prodajna_cena = ?, vreme_prodaje_dana = ? WHERE id = ?',
-      [datum_prodaje, prodajna_cena, vreme_prodaje_dana, id]
-    );
+    const kolicinaProdato = kolicina_prodato || kolicina_trenutna;
+
+    // Kreiraj nove zapise za svaku prodatu jedinicu
+    for (let i = 0; i < kolicinaProdato; i++) {
+      db.run(
+        'INSERT INTO artikli (kategorija, naziv, nabavna_cena, ocekivana_cena, datum_kupovine, kolicina, prodat, datum_prodaje, prodajna_cena, vreme_prodaje_dana) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [kategorija, naziv, nabavna_cena, ocekivana_cena, datum_kupovine, 1, 1, datum_prodaje, prodajna_cena, vreme_prodaje_dana]
+      );
+    }
+
+    // Ažuriraj količinu ili obriši ako je sve prodato
+    const preostalaKolicina = kolicina_trenutna - kolicinaProdato;
+    if (preostalaKolicina <= 0) {
+      db.run('DELETE FROM artikli WHERE id = ?', [id]);
+    } else {
+      db.run('UPDATE artikli SET kolicina = ? WHERE id = ?', [preostalaKolicina, id]);
+    }
 
     saveDatabase();
 
-    const updatedResult = db.exec('SELECT * FROM artikli WHERE id = ?', [id]);
-    const row = updatedResult[0].values[0];
-    const updatedArtikal = {
-      id: row[0],
-      kategorija: row[1],
-      naziv: row[2],
-      nabavna_cena: row[3],
-      datum_kupovine: row[4],
-      prodat: row[5],
-      datum_prodaje: row[6],
-      prodajna_cena: row[7],
-      vreme_prodaje_dana: row[8]
-    };
-
-    res.json(updatedArtikal);
+    res.json({ success: true, kolicina_prodato: kolicinaProdato });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

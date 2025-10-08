@@ -23,6 +23,7 @@ function App() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedArtikal, setSelectedArtikal] = useState(null);
   const [prodajnaCena, setProdajnaCena] = useState('');
+  const [kolicinaProdato, setKolicinaProdato] = useState(1);
   const [editArtikal, setEditArtikal] = useState(null);
 
   // Filteri i sortiranje
@@ -38,7 +39,8 @@ function App() {
     kategorija: 'RAM',
     naziv: '',
     nabavna_cena: '',
-    ocekivana_cena: ''
+    ocekivana_cena: '',
+    kolicina: 1
   });
 
   useEffect(() => {
@@ -74,7 +76,8 @@ function App() {
         kategorija: noviArtikal.kategorija,
         naziv: noviArtikal.naziv,
         nabavna_cena: parseFloat(noviArtikal.nabavna_cena),
-        ocekivana_cena: noviArtikal.ocekivana_cena ? parseFloat(noviArtikal.ocekivana_cena) : null
+        ocekivana_cena: noviArtikal.ocekivana_cena ? parseFloat(noviArtikal.ocekivana_cena) : null,
+        kolicina: parseInt(noviArtikal.kolicina) || 1
       };
 
       const response = await fetch(`${API_URL}/artikli`, {
@@ -90,7 +93,8 @@ function App() {
           kategorija: 'RAM',
           naziv: '',
           nabavna_cena: '',
-          ocekivana_cena: ''
+          ocekivana_cena: '',
+          kolicina: 1
         });
         fetchArtikliStanje();
       }
@@ -119,6 +123,7 @@ function App() {
   const handleProdajArtikal = (artikal) => {
     setSelectedArtikal(artikal);
     setProdajnaCena('');
+    setKolicinaProdato(artikal.kolicina || 1);
     setShowModal(true);
   };
 
@@ -128,19 +133,28 @@ function App() {
       return;
     }
 
+    if (!kolicinaProdato || kolicinaProdato <= 0 || kolicinaProdato > (selectedArtikal.kolicina || 1)) {
+      alert(`Unesite validnu količinu (1-${selectedArtikal.kolicina || 1})`);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/artikli/${selectedArtikal.id}/prodaj`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prodajna_cena: parseFloat(prodajnaCena) }),
+        body: JSON.stringify({
+          prodajna_cena: parseFloat(prodajnaCena),
+          kolicina_prodato: parseInt(kolicinaProdato)
+        }),
       });
 
       if (response.ok) {
         setShowModal(false);
         setSelectedArtikal(null);
         setProdajnaCena('');
+        setKolicinaProdato(1);
         fetchArtikliStanje();
         fetchArtikliProdati();
       }
@@ -156,6 +170,7 @@ function App() {
       naziv: artikal.naziv,
       nabavna_cena: artikal.nabavna_cena,
       ocekivana_cena: artikal.ocekivana_cena || '',
+      kolicina: artikal.kolicina || 1,
       prodat: artikal.prodat,
       prodajna_cena: artikal.prodajna_cena || ''
     });
@@ -169,7 +184,8 @@ function App() {
         naziv: editArtikal.naziv,
         nabavna_cena: parseFloat(editArtikal.nabavna_cena),
         ocekivana_cena: editArtikal.ocekivana_cena ? parseFloat(editArtikal.ocekivana_cena) : null,
-        prodajna_cena: editArtikal.prodajna_cena ? parseFloat(editArtikal.prodajna_cena) : null
+        prodajna_cena: editArtikal.prodajna_cena ? parseFloat(editArtikal.prodajna_cena) : null,
+        kolicina: parseInt(editArtikal.kolicina) || 1
       };
 
       const response = await fetch(`${API_URL}/artikli/${editArtikal.id}`, {
@@ -328,6 +344,18 @@ function App() {
                     step="0.01"
                   />
                 </div>
+                <div className="forma-group">
+                  <label>Količina</label>
+                  <input
+                    type="number"
+                    value={noviArtikal.kolicina}
+                    onChange={(e) => setNoviArtikal({ ...noviArtikal, kolicina: e.target.value })}
+                    placeholder="1"
+                    min="1"
+                    step="1"
+                    required
+                  />
+                </div>
               </div>
               <button type="submit" className="btn btn-primary">Dodaj artikal</button>
             </form>
@@ -362,6 +390,7 @@ function App() {
                   <th>Naziv</th>
                   <th>Nabavna cena</th>
                   <th>Očekivana cena</th>
+                  <th>Količina</th>
                   <th>Datum kupovine</th>
                   <th>Akcije</th>
                 </tr>
@@ -369,7 +398,7 @@ function App() {
               <tbody>
                 {filteredStanje.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
                       Nema artikala na stanju
                     </td>
                   </tr>
@@ -382,6 +411,7 @@ function App() {
                       <td>{artikal.naziv}</td>
                       <td className="cena">{formatCena(artikal.nabavna_cena)}</td>
                       <td className="cena">{artikal.ocekivana_cena ? formatCena(artikal.ocekivana_cena) : '-'}</td>
+                      <td>{artikal.kolicina || 1}</td>
                       <td>{artikal.datum_kupovine}</td>
                       <td>
                         <div className="akcije">
@@ -565,7 +595,7 @@ function App() {
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
                     const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
-                    return stanjeFiltered.length + prodatiFiltered.length;
+                    return stanjeFiltered.reduce((sum, a) => sum + (a.kolicina || 1), 0) + prodatiFiltered.length;
                   })()}
                 </div>
                 <div className="kartica-opis">Ukupno artikala (na stanju + prodato)</div>
@@ -578,7 +608,7 @@ function App() {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
                     const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
                     return formatCena(
-                      stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0) +
+                      stanjeFiltered.reduce((sum, a) => sum + (a.nabavna_cena * (a.kolicina || 1)), 0) +
                       prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0)
                     );
                   })()}
@@ -593,7 +623,7 @@ function App() {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
                     const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
                     return formatCena(
-                      stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0) +
+                      stanjeFiltered.reduce((sum, a) => sum + ((a.ocekivana_cena || 0) * (a.kolicina || 1)), 0) +
                       prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0)
                     );
                   })()}
@@ -607,9 +637,9 @@ function App() {
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
                     const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
-                    const ukupnoUlozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0) +
+                    const ukupnoUlozeno = stanjeFiltered.reduce((sum, a) => sum + (a.nabavna_cena * (a.kolicina || 1)), 0) +
                                          prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
-                    const ukupnoOcekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0) +
+                    const ukupnoOcekivano = stanjeFiltered.reduce((sum, a) => sum + ((a.ocekivana_cena || 0) * (a.kolicina || 1)), 0) +
                                            prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0);
                     return formatCena(ukupnoOcekivano - ukupnoUlozeno);
                   })()}
@@ -623,9 +653,9 @@ function App() {
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
                     const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
-                    const ukupnoUlozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0) +
+                    const ukupnoUlozeno = stanjeFiltered.reduce((sum, a) => sum + (a.nabavna_cena * (a.kolicina || 1)), 0) +
                                          prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
-                    const ukupnoOcekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0) +
+                    const ukupnoOcekivano = stanjeFiltered.reduce((sum, a) => sum + ((a.ocekivana_cena || 0) * (a.kolicina || 1)), 0) +
                                            prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0);
                     const procenat = ukupnoUlozeno > 0 ? ((ukupnoOcekivano - ukupnoUlozeno) / ukupnoUlozeno * 100).toFixed(2) : 0;
                     return `${procenat}%`;
@@ -644,7 +674,7 @@ function App() {
                 <div className="kartica-vrednost">
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
-                    return stanjeFiltered.length;
+                    return stanjeFiltered.reduce((sum, a) => sum + (a.kolicina || 1), 0);
                   })()}
                 </div>
                 <div className="kartica-opis">Artikala na stanju</div>
@@ -655,7 +685,7 @@ function App() {
                 <div className="kartica-vrednost">
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
-                    return formatCena(stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0));
+                    return formatCena(stanjeFiltered.reduce((sum, a) => sum + (a.nabavna_cena * (a.kolicina || 1)), 0));
                   })()}
                 </div>
                 <div className="kartica-opis">Ukupna nabavna vrednost</div>
@@ -666,7 +696,7 @@ function App() {
                 <div className="kartica-vrednost">
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
-                    return formatCena(stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0));
+                    return formatCena(stanjeFiltered.reduce((sum, a) => sum + ((a.ocekivana_cena || 0) * (a.kolicina || 1)), 0));
                   })()}
                 </div>
                 <div className="kartica-opis">Ukupna očekivana cena</div>
@@ -677,8 +707,8 @@ function App() {
                 <div className="kartica-vrednost">
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
-                    const ulozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
-                    const ocekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0);
+                    const ulozeno = stanjeFiltered.reduce((sum, a) => sum + (a.nabavna_cena * (a.kolicina || 1)), 0);
+                    const ocekivano = stanjeFiltered.reduce((sum, a) => sum + ((a.ocekivana_cena || 0) * (a.kolicina || 1)), 0);
                     return formatCena(ocekivano - ulozeno);
                   })()}
                 </div>
@@ -690,8 +720,8 @@ function App() {
                 <div className="kartica-vrednost">
                   {(() => {
                     const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
-                    const ulozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
-                    const ocekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0);
+                    const ulozeno = stanjeFiltered.reduce((sum, a) => sum + (a.nabavna_cena * (a.kolicina || 1)), 0);
+                    const ocekivano = stanjeFiltered.reduce((sum, a) => sum + ((a.ocekivana_cena || 0) * (a.kolicina || 1)), 0);
                     const procenat = ulozeno > 0 ? ((ocekivano - ulozeno) / ulozeno * 100).toFixed(2) : 0;
                     return `${procenat}%`;
                   })()}
@@ -774,8 +804,22 @@ function App() {
             <h3>Prodaja artikla</h3>
             <p><strong>Naziv:</strong> {selectedArtikal?.naziv}</p>
             <p><strong>Nabavna cena:</strong> {formatCena(selectedArtikal?.nabavna_cena)}</p>
+            <p><strong>Dostupna količina:</strong> {selectedArtikal?.kolicina || 1}</p>
             <div className="forma-group" style={{ marginTop: '20px' }}>
-              <label>Prodajna cena (EUR)</label>
+              <label>Količina za prodaju</label>
+              <input
+                type="number"
+                value={kolicinaProdato}
+                onChange={(e) => setKolicinaProdato(e.target.value)}
+                placeholder="1"
+                min="1"
+                max={selectedArtikal?.kolicina || 1}
+                step="1"
+                autoFocus
+              />
+            </div>
+            <div className="forma-group" style={{ marginTop: '15px' }}>
+              <label>Prodajna cena (EUR) - po komadu</label>
               <input
                 type="number"
                 value={prodajnaCena}
@@ -783,7 +827,6 @@ function App() {
                 placeholder="10000"
                 min="0"
                 step="0.01"
-                autoFocus
               />
             </div>
             <div className="modal-actions">
@@ -844,6 +887,19 @@ function App() {
                 step="0.01"
               />
             </div>
+            {editArtikal.prodat === 0 && (
+              <div className="forma-group" style={{ marginTop: '15px' }}>
+                <label>Količina</label>
+                <input
+                  type="number"
+                  value={editArtikal.kolicina}
+                  onChange={(e) => setEditArtikal({ ...editArtikal, kolicina: e.target.value })}
+                  placeholder="1"
+                  min="1"
+                  step="1"
+                />
+              </div>
+            )}
             {editArtikal.prodat === 1 && (
               <div className="forma-group" style={{ marginTop: '15px' }}>
                 <label>Prodajna cena (EUR)</label>

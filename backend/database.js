@@ -28,6 +28,7 @@ async function initDatabase() {
       nabavna_cena REAL NOT NULL,
       ocekivana_cena REAL,
       datum_kupovine TEXT NOT NULL,
+      kolicina INTEGER DEFAULT 1,
       prodat INTEGER DEFAULT 0,
       datum_prodaje TEXT,
       prodajna_cena REAL,
@@ -38,6 +39,13 @@ async function initDatabase() {
   // Dodaj kolonu ocekivana_cena ako ne postoji (za postojeće baze)
   try {
     db.run('ALTER TABLE artikli ADD COLUMN ocekivana_cena REAL');
+  } catch (e) {
+    // Kolona već postoji, ignoriši grešku
+  }
+
+  // Dodaj kolonu kolicina ako ne postoji (za postojeće baze)
+  try {
+    db.run('ALTER TABLE artikli ADD COLUMN kolicina INTEGER DEFAULT 1');
   } catch (e) {
     // Kolona već postoji, ignoriši grešku
   }
