@@ -28,6 +28,9 @@ function App() {
   // Filteri i sortiranje
   const [filterKategorijaStanje, setFilterKategorijaStanje] = useState('Sve');
   const [filterKategorijaProdati, setFilterKategorijaProdati] = useState('Sve');
+  const [filterKategorijaStatistika, setFilterKategorijaStatistika] = useState('Sve');
+  const [filterMesecStatistika, setFilterMesecStatistika] = useState('Sve');
+  const [filterGodinaStatistika, setFilterGodinaStatistika] = useState('Sve');
   const [sortStanje, setSortStanje] = useState('datum_desc');
   const [sortProdati, setSortProdati] = useState('datum_prodaje_desc');
 
@@ -197,6 +200,14 @@ function App() {
     }).format(cena);
   };
 
+  const filterArtikalStatistika = (artikal) => {
+    const datumKupovine = artikal.datum_kupovine;
+    const [god, mes] = datumKupovine.split('-');
+    return (filterKategorijaStatistika === 'Sve' || artikal.kategorija === filterKategorijaStatistika) &&
+           (filterGodinaStatistika === 'Sve' || god === filterGodinaStatistika) &&
+           (filterMesecStatistika === 'Sve' || mes === filterMesecStatistika);
+  };
+
   // Filtriraj i sortiraj artikle na stanju
   const filteredStanje = artikliStanje
     .filter(artikal => filterKategorijaStanje === 'Sve' || artikal.kategorija === filterKategorijaStanje)
@@ -257,6 +268,12 @@ function App() {
           onClick={() => setActiveTab('prodati')}
         >
           Prodati artikli
+        </button>
+        <button
+          className={`tab ${activeTab === 'statistika' ? 'active' : ''}`}
+          onClick={() => setActiveTab('statistika')}
+        >
+          Statistika
         </button>
       </div>
 
@@ -489,6 +506,266 @@ function App() {
             </table>
           </div>
         </>
+      )}
+
+      {activeTab === 'statistika' && (
+        <div className="statistika-container">
+          <div className="filter-sort-container">
+            <div className="forma-group">
+              <label>Filtriraj po kategoriji</label>
+              <select value={filterKategorijaStatistika} onChange={(e) => setFilterKategorijaStatistika(e.target.value)}>
+                <option value="Sve">Sve kategorije</option>
+                {KATEGORIJE.map(kat => (
+                  <option key={kat} value={kat}>{kat}</option>
+                ))}
+              </select>
+            </div>
+            <div className="forma-group">
+              <label>Filtriraj po mesecu</label>
+              <select value={filterMesecStatistika} onChange={(e) => setFilterMesecStatistika(e.target.value)}>
+                <option value="Sve">Svi meseci</option>
+                <option value="01">Januar</option>
+                <option value="02">Februar</option>
+                <option value="03">Mart</option>
+                <option value="04">April</option>
+                <option value="05">Maj</option>
+                <option value="06">Jun</option>
+                <option value="07">Jul</option>
+                <option value="08">Avgust</option>
+                <option value="09">Septembar</option>
+                <option value="10">Oktobar</option>
+                <option value="11">Novembar</option>
+                <option value="12">Decembar</option>
+              </select>
+            </div>
+            <div className="forma-group">
+              <label>Filtriraj po godini</label>
+              <select value={filterGodinaStatistika} onChange={(e) => setFilterGodinaStatistika(e.target.value)}>
+                <option value="Sve">Sve godine</option>
+                {(() => {
+                  const trenutnaGodina = new Date().getFullYear();
+                  const godine = [];
+                  for (let i = trenutnaGodina; i >= trenutnaGodina - 10; i--) {
+                    godine.push(i);
+                  }
+                  return godine.map(god => (
+                    <option key={god} value={god}>{god}</option>
+                  ));
+                })()}
+              </select>
+            </div>
+          </div>
+
+          <div className="statistika-sekcija ukupno">
+            <h2>Ukupno {filterKategorijaStatistika !== 'Sve' && `- ${filterKategorijaStatistika}`}</h2>
+            <div className="statistika-kartice">
+              <div className="statistika-kartica info">
+                <div className="kartica-naslov">Broj komponenti</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    return stanjeFiltered.length + prodatiFiltered.length;
+                  })()}
+                </div>
+                <div className="kartica-opis">Ukupno artikala (na stanju + prodato)</div>
+              </div>
+
+              <div className="statistika-kartica info">
+                <div className="kartica-naslov">Ukupno uloženo</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    return formatCena(
+                      stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0) +
+                      prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0)
+                    );
+                  })()}
+                </div>
+                <div className="kartica-opis">Nabavna vrednost svih artikala</div>
+              </div>
+
+              <div className="statistika-kartica info">
+                <div className="kartica-naslov">Ukupno očekivano</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    return formatCena(
+                      stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0) +
+                      prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0)
+                    );
+                  })()}
+                </div>
+                <div className="kartica-opis">Očekivana + stvarna zarada</div>
+              </div>
+
+              <div className="statistika-kartica profit">
+                <div className="kartica-naslov">Ukupan očekivan profit</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    const ukupnoUlozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0) +
+                                         prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
+                    const ukupnoOcekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0) +
+                                           prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0);
+                    return formatCena(ukupnoOcekivano - ukupnoUlozeno);
+                  })()}
+                </div>
+                <div className="kartica-opis">Ukupan profit (očekivan + ostvaren)</div>
+              </div>
+
+              <div className="statistika-kartica procenat">
+                <div className="kartica-naslov">Ukupan profit %</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    const ukupnoUlozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0) +
+                                         prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
+                    const ukupnoOcekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0) +
+                                           prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0);
+                    const procenat = ukupnoUlozeno > 0 ? ((ukupnoOcekivano - ukupnoUlozeno) / ukupnoUlozeno * 100).toFixed(2) : 0;
+                    return `${procenat}%`;
+                  })()}
+                </div>
+                <div className="kartica-opis">Procenat ukupnog profita</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="statistika-sekcija">
+            <h2>Trenutno stanje {filterKategorijaStatistika !== 'Sve' && `- ${filterKategorijaStatistika}`}</h2>
+            <div className="statistika-kartice">
+              <div className="statistika-kartica">
+                <div className="kartica-naslov">Broj komponenti</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    return stanjeFiltered.length;
+                  })()}
+                </div>
+                <div className="kartica-opis">Artikala na stanju</div>
+              </div>
+
+              <div className="statistika-kartica">
+                <div className="kartica-naslov">Uloženo</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    return formatCena(stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0));
+                  })()}
+                </div>
+                <div className="kartica-opis">Ukupna nabavna vrednost</div>
+              </div>
+
+              <div className="statistika-kartica">
+                <div className="kartica-naslov">Očekivana zarada</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    return formatCena(stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0));
+                  })()}
+                </div>
+                <div className="kartica-opis">Ukupna očekivana cena</div>
+              </div>
+
+              <div className="statistika-kartica profit">
+                <div className="kartica-naslov">Očekivan profit</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const ulozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
+                    const ocekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0);
+                    return formatCena(ocekivano - ulozeno);
+                  })()}
+                </div>
+                <div className="kartica-opis">Razlika očekivane i nabavne cene</div>
+              </div>
+
+              <div className="statistika-kartica procenat">
+                <div className="kartica-naslov">Očekivan profit %</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const stanjeFiltered = artikliStanje.filter(filterArtikalStatistika);
+                    const ulozeno = stanjeFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
+                    const ocekivano = stanjeFiltered.reduce((sum, a) => sum + (a.ocekivana_cena || 0), 0);
+                    const procenat = ulozeno > 0 ? ((ocekivano - ulozeno) / ulozeno * 100).toFixed(2) : 0;
+                    return `${procenat}%`;
+                  })()}
+                </div>
+                <div className="kartica-opis">Procenat profita</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="statistika-sekcija">
+            <h2>Prodate komponente {filterKategorijaStatistika !== 'Sve' && `- ${filterKategorijaStatistika}`}</h2>
+            <div className="statistika-kartice">
+              <div className="statistika-kartica">
+                <div className="kartica-naslov">Broj komponenti</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    return prodatiFiltered.length;
+                  })()}
+                </div>
+                <div className="kartica-opis">Prodatih artikala</div>
+              </div>
+
+              <div className="statistika-kartica">
+                <div className="kartica-naslov">Uloženo</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    return formatCena(prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0));
+                  })()}
+                </div>
+                <div className="kartica-opis">Ukupna nabavna vrednost</div>
+              </div>
+
+              <div className="statistika-kartica">
+                <div className="kartica-naslov">Zarada</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    return formatCena(prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0));
+                  })()}
+                </div>
+                <div className="kartica-opis">Ukupna prodajna vrednost</div>
+              </div>
+
+              <div className="statistika-kartica profit">
+                <div className="kartica-naslov">Profit</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    const ulozeno = prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
+                    const zarada = prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0);
+                    return formatCena(zarada - ulozeno);
+                  })()}
+                </div>
+                <div className="kartica-opis">Razlika prodajne i nabavne cene</div>
+              </div>
+
+              <div className="statistika-kartica procenat">
+                <div className="kartica-naslov">Profit %</div>
+                <div className="kartica-vrednost">
+                  {(() => {
+                    const prodatiFiltered = artikliProdati.filter(filterArtikalStatistika);
+                    const ulozeno = prodatiFiltered.reduce((sum, a) => sum + a.nabavna_cena, 0);
+                    const zarada = prodatiFiltered.reduce((sum, a) => sum + (a.prodajna_cena || 0), 0);
+                    const procenat = ulozeno > 0 ? ((zarada - ulozeno) / ulozeno * 100).toFixed(2) : 0;
+                    return `${procenat}%`;
+                  })()}
+                </div>
+                <div className="kartica-opis">Procenat profita</div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showModal && (
